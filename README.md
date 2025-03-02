@@ -86,10 +86,10 @@ When running locally, the API is typically available at `http://localhost:3000/j
 Retrieves all jobs from the database.
 
 **Query Parameters:**
-- `location` (optional): Number of records to return (default: 20)
-- `page` (optional): Number of records to return (default: 20)
-- `postedOn` (optional): Number of records to return (default: 20)
-- `company` (optional): Number of records to return (default: 20)
+- `location` (optional): filter by location for the job
+- `page` (optional): fetch response for current page number
+- `postedOn` (optional): filter by date given
+- `company` (optional): filter by company name - 'Google' , 'Microsoft', 'Amazon'
 
 ## Scraper Usage
 
