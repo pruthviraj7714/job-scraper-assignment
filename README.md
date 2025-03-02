@@ -21,8 +21,8 @@ This application is built using Turborepo, a high-performance build system for J
 
 1. Clone the repository:
    ```bash
-   git clone <repository-url>
-   cd <repository-directory>
+   git clone https://github.com/pruthviraj7714/job-scraper-assignment.git
+   cd job-scraper-assignment
    ```
 
 2. Install dependencies:
@@ -69,9 +69,8 @@ pnpm dev
 ```
 
 This will start all packages defined in your Turborepo workspace, including:
-- Frontend application (if applicable)
 - API server
-- Scraper service (if scheduled to run automatically)
+- Scraper service 
 
 ## API Usage
 
@@ -80,9 +79,6 @@ The API provides endpoints for interacting with the application data.
 ### Base URL
 
 When running locally, the API is typically available at `http://localhost:3000/jobs` 
-### Authentication
-
-[Document authentication method here - tokens, cookies, etc.]
 
 ### Endpoints
 

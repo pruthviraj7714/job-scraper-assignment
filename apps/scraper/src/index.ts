@@ -249,7 +249,7 @@ async function scrapeAmazonJobs() {
 
 async function main() {
   try {
-    await prisma.job.deleteMany({});
+    // await prisma.job.deleteMany({});
 
     await scrapeMicrosoftJobs();
     await scrapeGoogleJobs();
