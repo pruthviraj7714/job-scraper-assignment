@@ -3,13 +3,14 @@ import prisma from "@repo/db/client";
 
 const app = express();
 
+const MAX_PER_PAGE = 10;
+
 app.get("/", (req : Request, res : Response) => {
   res.send("Healthy server");
 });
 
 app.get("/jobs", async (req: Request, res: Response): Promise<void> => {
   const { company = "", location = "", postedOn = "", page = "1" } = req.query;
-  const MAX_PER_PAGE = 10;
   const currentPage = Number(page) || 1;
 
   try {

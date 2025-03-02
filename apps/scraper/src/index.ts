@@ -1,6 +1,17 @@
 import prisma from "@repo/db/client";
 import axios from "axios";
 import { AmazonJob, GoogleJob, MicrosoftJob } from "./types";
+import crypto from "crypto";
+
+function createJobHash(
+  company: string,
+  title: string,
+  location: string,
+  postedDate: string
+) {
+  const data = `${company}-${title}-${location}-${postedDate}`.toLowerCase();
+  return crypto.createHash("sha256").update(data).digest("hex");
+}
 
 async function scrapeMicrosoftJobs() {
   try {
@@ -15,11 +26,22 @@ async function scrapeMicrosoftJobs() {
     const results = await Promise.all(
       jobs.map(async (job: MicrosoftJob) => {
         try {
+          const jobHash = createJobHash(
+            "Microsoft",
+            job.title,
+            job.properties.primaryLocation,
+            job.postingDate.toString()
+          );
           const existingJob = await prisma.job.findFirst({
             where: {
-              company: "Microsoft",
-              title: job.title,
-              postedOn: job.postingDate,
+              OR : [
+                {
+                  jobHash: jobHash,
+                },
+                {
+                  url : `https://careers.microsoft.com/us/en/job/${job.jobId}/${job.title}` 
+                }
+              ]
             },
           });
 
@@ -31,9 +53,20 @@ async function scrapeMicrosoftJobs() {
                 location: job.properties.primaryLocation,
                 postedOn: job.postingDate,
                 title: job.title,
-                url: `https://careers.microsoft.com/us/en/job/${job.jobId}`,
+                jobHash: jobHash,
+                url: `https://careers.microsoft.com/us/en/job/${job.jobId}/${job.title}`,
               },
             });
+          }else if(existingJob.lastUpdated < new Date(existingJob.postedOn)) {
+            await prisma.job.update({
+              where : {
+                id : existingJob.id
+              },
+              data : {
+                lastUpdated : new Date(),
+                postedOn : job.postingDate
+              }
+            })
           }
           return null;
         } catch (error) {
@@ -62,17 +95,26 @@ async function scrapeGoogleJobs() {
 
     const results = await Promise.all(
       jobs.map(async (job: GoogleJob) => {
+        const jobHash = createJobHash(
+          "Google",
+          job.title,
+          job.locations[0]?.display!,
+          job.publish_date.toString()
+        );
         try {
           const existingJob = await prisma.job.findFirst({
             where: {
-              company: "Google",
-              title: job.title,
-              location:
-                job.locations && job.locations.length > 0
-                  ? job?.locations[0]?.display
-                  : "Unknown",
+              OR: [
+                {
+                  jobHash: jobHash,
+                },
+                {
+                  url: job.apply_url,
+                },
+              ],
             },
           });
+
 
           if (!existingJob) {
             return await prisma.job.create({
@@ -81,11 +123,22 @@ async function scrapeGoogleJobs() {
                 description:
                   job.description.intro || "No description available",
                 location: job?.locations[0]?.display as string,
-                postedOn: new Date(job.publish_date),
+                postedOn: job.publish_date,
                 title: job.title,
                 url: job.apply_url,
+                jobHash: jobHash,
               },
             });
+          } else if(existingJob.lastUpdated < new Date(job.publish_date)) {
+            await prisma.job.update({
+              where  :{
+                id : existingJob.id
+              },
+               data : {
+                postedOn : job.publish_date,
+                lastUpdated : new Date()
+               }
+            })
           }
           return null;
         } catch (error) {
@@ -112,42 +165,85 @@ async function scrapeAmazonJobs() {
     const jobs = response.data.jobs || [];
     console.log(`Found ${jobs.length} Amazon jobs`);
 
-    const results = await Promise.all(
-      jobs.map(async (job: AmazonJob) => {
-        try {
-          const existingJob = await prisma.job.findFirst({
+    let newJobCount = 0;
+    let updatedJobCount = 0;
+
+    for (let i = 0; i < jobs.length; i++) {
+      const job = jobs[i];
+      const jobIndex = i + 1;
+      
+      const jobHash = createJobHash(
+        "Amazon",
+        job.title,
+        job.location,
+        job.posted_date.toString()
+      );
+
+      try {
+        await prisma.$transaction(async (tx) => {
+          const existingJob = await tx.job.findFirst({
             where: {
-              company: "Amazon",
-              title: job.title,
-              location: job.location || "Unknown",
-              postedOn: job.posted_date,
+              OR: [
+                { jobHash: jobHash },
+                { url: job.url_next_step }
+              ]
             },
           });
 
           if (!existingJob) {
-            return await prisma.job.create({
+            await tx.job.create({
               data: {
                 company: "Amazon",
                 description: job.description || "No description available",
                 location: job.location,
-                postedOn: new Date(job.posted_date),
+                postedOn: job.posted_date,
                 title: job.title,
-                url: `https://www.amazon.jobs${job.job_path}`,
+                url: job.url_next_step,
+                jobHash,
+                lastUpdated: new Date(),
               },
             });
+            newJobCount++;
+          } else {
+            const newPostedDate = new Date(job.posted_date);
+            const existingPostedDate = new Date(existingJob.postedOn);
+            
+            if (newPostedDate > existingPostedDate || 
+                (existingJob.description !== job.description)) {
+              await tx.job.update({
+                where: {
+                  id: existingJob.id
+                },
+                data: {
+                  description: job.description || "No description available",
+                  postedOn: job.posted_date,
+                  lastUpdated: new Date()
+                }
+              });
+              updatedJobCount++;
+            }
           }
-          return null;
-        } catch (error) {
-          console.error(`Error processing Amazon job ${job.title}:`, error);
-          return null;
-        }
-      })
-    );
+        });
+      } catch (error) {
+        console.error(`Error processing Amazon job ${jobIndex}/${jobs.length}: ${job.title}`);
+        console.error(`Job data: ${JSON.stringify({
+          title: job.title,
+          location: job.location,
+          posted_date: job.posted_date,
+          url: job.url_next_step,
+          hash: jobHash
+        })}`);
+        console.error(`Error details: ${error}`);
+      }
+    }
 
-    const newJobs = results.filter((result) => result !== null);
-    console.log(`Added ${newJobs.length} new Amazon jobs`);
+    console.log(`Added ${newJobCount} new Amazon jobs`);
+    console.log(`Updated ${updatedJobCount} existing Amazon jobs`);
+    
+    return newJobCount + updatedJobCount;
   } catch (error) {
     console.error("Error scraping Amazon jobs:", error);
+    return 0;
   }
 }
 

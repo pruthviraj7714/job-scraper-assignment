@@ -3,7 +3,7 @@
 export interface MicrosoftJob {
     jobId: string;
     title: string;
-    postingDate: Date;
+    postingDate: string;
     properties: {
       description: string;
       locations: string[];
@@ -40,5 +40,6 @@ export interface AmazonJob {
     description: string;
     job_category: string;
     job_schedule_type: string;
+    url_next_step : string;
   }
   

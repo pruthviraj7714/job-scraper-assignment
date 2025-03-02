@@ -17,8 +17,10 @@ model Job {
   id          String   @id @default(uuid())
   title       String
   company     String
-  location    Json
+  location    String
   description String
-  postedOn    DateTime
-  url         String   @unique
+  postedOn    String
+  url         String?  @unique
+  jobHash     String?  @unique
+  lastUpdated  DateTime   @default(now())
 }
