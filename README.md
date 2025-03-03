@@ -99,17 +99,10 @@ The scraper is designed to collect data from specified sources and store it in t
 
 To run the scraper manually:
 
-```bash
-# From the root directory
-pnpm run scrape
-```
-
-Or navigate to the scraper package:
+navigate to the scraper package:
 
 ```bash
 cd apps/scraper
 pnpm run start
 ```
 
-
-For additional help, please [contact the support team/open an issue].
